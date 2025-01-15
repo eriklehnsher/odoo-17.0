@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_sale_plan_manager,sale.plan.manager,model_e_sale_plan,sales_team.group_sale_manager,1,1,1,1
+access_sale_plan_leader,sale.plan.leader,model_e_sale_plan,sales_team.group_sale_manager,1,1,1,0
+access_sale_plan,sale.plan,model_e_sale_plan,sales_team.group_sale_salesman,1,1,1,0
+access_sale_plan_user,sale.plan.user,model_e_sale_plan_approver,base.group_user,1,1,1,1
