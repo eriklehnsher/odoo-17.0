@@ -1,5 +1,6 @@
 from pkg_resources import require
 from reportlab.lib.randomtext import subjects
+from requests_toolbelt.multipart.encoder import total_len
 
 from odoo import models, fields, api
 
@@ -14,7 +15,7 @@ class SalePlan(models.Model):
 
     name = fields.Char(string='Tên kế hoạch')
     quotation_id = fields.Many2one('sale.order', string='Báo giá', readonly=True)
-    sale_plan_info = fields.Char(string='Thông tin kế hoạch',required=True)
+    sale_plan_info = fields.Char(string='Thông tin kế hoạch')
     sale_plan_approver_lines = fields.One2many('e.sale.plan.approver', 'sale_plan_id', string='Duyệt kế hoạch')
     state = fields.Selection([
         ('new', 'Mới'),
@@ -29,7 +30,8 @@ class SalePlan(models.Model):
         self.ensure_one()
         # current_user = self.env.user
         approvers = self.sale_plan_approver_lines.mapped('approver_id')
-
+        for approver_line in self.sale_plan_approver_lines:
+            approver_line.state = 'send_to_approver'
         for approver in approvers:
             if approver:
                 self.message_post(
@@ -42,12 +44,25 @@ class SalePlan(models.Model):
 
     def _update_plan_state(self):
         for plan in self:
-            if all (approver.state == 'approved' for approver in plan.sale_plan_approver_lines):
+            approver_states = plan.sale_plan_approver_lines.mapped('state')
+            approved_count = approver_states.count('approved')
+            rejected_count = approver_states.count('rejected')
+            total_approvers = len(plan.sale_plan_approver_lines)
+
+            if approved_count == total_approvers:
                 plan.state = 'approved'
-            elif any(approver.state == 'rejected' for approver in plan.sale_plan_approver_lines):
+            elif rejected_count == total_approvers:
                 plan.state = 'rejected'
             else:
-                plan.state = 'send_to_approver'
+                plan.state = 'new'
+                creator_partner = plan.create_uid.partner_id
+                if creator_partner:
+                    plan.message_post(
+                        body=f"Kế hoạch bán hàng: {plan.name} chưa được duyệt hoàn toàn. Vui lòng xem lại kế hoạch.",
+                        subject='Kế hoạch chưa được duyệt',
+                        partner_ids=[creator_partner.id],
+                        message_type='notification',
+                    )
 
 
 class SalePlanApprover(models.Model):
@@ -58,9 +73,8 @@ class SalePlanApprover(models.Model):
     approver_id = fields.Many2one('res.partner', string='Người duyệt')
     # approve_date = fields.Date(string='Ngày duyệt')
     state = fields.Selection([
-
+        ('send_to_approver', 'Gửi duyệt'),
         ('approved', 'Duyệt'),
-        ('not_approved_yet', 'Chưa duyệt'),
         ('rejected', 'Từ chối')
 
     ], string='Trạng thái', default='')
@@ -81,31 +95,36 @@ class SalePlanApprover(models.Model):
             self.sale_plan_id._update_plan_state()
         return result
 
-
     def action_approve(self):
+        current_user = self.env.user
+        if self.approver_id.id != current_user.partner_id.id:
+            raise UserError('Bạn không thể duyệt cho người khác.')
         self.state = 'approved'
         self.sale_plan_id._update_plan_state()
-        current_user = self.env.user
+
         creator_partner = self.sale_plan_id.create_uid.partner_id
-        print('Người Tạo kế hoạch: ',creator_partner)
         if creator_partner:
             self.sale_plan_id.message_post(
-                body=f"{current_user.name} Đã duyệt kế hoạch bán hàng: {self.sale_plan_id.name}",
+                body=f"{current_user.name} đã duyệt kế hoạch bán hàng: {self.sale_plan_id.name}.",
                 subject='Duyệt kế hoạch bán hàng',
                 partner_ids=[creator_partner.id],
                 message_type='notification',
             )
 
     def action_reject(self):
+        current_user = self.env.user
+        if self.approver_id.id != current_user.partner_id.id:
+            raise UserError('Bạn không thể từ chối cho người khác.')
         self.state = 'rejected'
-        self.sale_plan_id.state = 'rejected'
-        current_user  = self.env.user
+        self.sale_plan_id._update_plan_state()
+
         creator_partner = self.sale_plan_id.create_uid.partner_id
         if creator_partner:
             self.sale_plan_id.message_post(
-                body=f"{current_user.name} Đã từ chối duyệt kế hoạch bán hàng: {self.sale_plan_id.name}",
-                subject='Từ chối duyệt kế hoạch bán hàng',
+                body=f"{current_user.name} đã từ chối duyệt kế hoạch bán hàng: {self.sale_plan_id.name}.",
+                subject='Từ chối kế hoạch bán hàng',
                 partner_ids=[creator_partner.id],
                 message_type='notification',
             )
+
 

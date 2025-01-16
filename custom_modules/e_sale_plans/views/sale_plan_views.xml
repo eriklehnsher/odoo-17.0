@@ -15,9 +15,9 @@
 
                 <sheet>
                     <group>
-                        <field name="name" readonly="state in ['approved','rejected']"/>
+                        <field name="name" readonly="state in ['approved','rejected'] and create_uid != uid" required="1"/>
                         <field name="quotation_id"/>
-                        <field name="sale_plan_info" readonly="state in ['approved','rejected']"/>
+                        <field name="sale_plan_info" readonly="state in ['approved','rejected']" required="1"/>
                         <field name="create_uid" invisible="1"/>
                     </group>
                     <notebook>
@@ -25,22 +25,25 @@
                             <field name="sale_plan_approver_lines">
                                 <tree editable="bottom">
                                     <field name="create_uid" readonly="1"/>
-                                    <field name="approver_id" />
+                                    <field name="approver_id" readonly="state in ['approved','rejected']" />
                                     <field name="state"
-                                           widget="badge"
+
                                            decoration-success="state == 'approved'"
                                            decoration-danger="state == 'rejected'"
-                                           decoration-warning="state == 'send_to_approver'"
+                                           decoration-warning="state == 'not_approved_yet'"
+                                           readonly="state in ['approved','rejected']"
                                            />
                                     <button name="action_approve"
                                             string="Phê duyệt"
                                             type="object"
                                             class="oe_highlight"
+                                            invisible="state in ['approved','rejected']"
                                     />
                                     <button name="action_reject"
                                             string="Từ chối"
                                             type="object"
                                             class="oe_highlight"
+                                            invisible="state in ['approved','rejected']"
                                     />
                                 </tree>
                             </field>
