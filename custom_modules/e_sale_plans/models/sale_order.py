@@ -29,11 +29,9 @@ class SaleOrder(models.Model):
 
     def action_confirm(self):
         for order in self:
-
             if not order.sale_plan_ids:
                 raise UserError('Không thể xác nhận báo giá khi chưa có kế hoạch bán hàng.')
             approved_plan_exists = any(plan.state == 'approved' for plan in order.sale_plan_ids)
             if not approved_plan_exists:
                 raise UserError('Không thể xác nhận báo giá khi không có kế hoạch bán hàng nào được duyệt.')
-
         return super(SaleOrder, self).action_confirm()
